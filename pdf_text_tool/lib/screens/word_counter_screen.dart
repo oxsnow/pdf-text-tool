@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 
 class WordCounterScreen extends StatefulWidget with FeatureScreen {
   const WordCounterScreen({super.key});
@@ -16,6 +18,18 @@ class WordCounterScreen extends StatefulWidget with FeatureScreen {
 
 class _WordCounterScreenState extends State<WordCounterScreen> {
   List<Widget> _wordFields = [];
+
+  Future<void> pickFile() async {
+  FilePickerResult? result = await FilePicker.platform.pickFiles();
+
+  if (result != null) {
+    PlatformFile file = result.files.first;
+    debugPrint('File name: ${file.name}');
+    debugPrint('File path: ${file.path}');
+  } else {
+    // User canceled the picker
+  }
+}
 
   void addField() {
     setState(() {
@@ -63,6 +77,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
 
               child: Column(
                 children: [
+                  ElevatedButton(onPressed: pickFile, child: const Text("Browse File")),
                   const Center(child: Text("Keywords List"),),
                   ..._wordFields,
                   ElevatedButton(onPressed: addField, child: const Icon(Icons.add))
