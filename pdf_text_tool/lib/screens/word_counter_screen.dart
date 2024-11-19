@@ -32,11 +32,14 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
       PlatformFile file = result.files.first;
       debugPrint('File name: ${file.name}');
       debugPrint('File path: ${file.path}');
-      _filePath = file.path!;
+      setState(() {
+        _filePath = file.path!;
+      });
     }
   }
 
   void startSearch(){
+    _sentencesList.clear();
     setState(() {
       List<String> keywords = [];
       for (var controller in _controllers) {
@@ -63,32 +66,37 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
       _controllers.add(controller);
       _wordFields.add(
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(10),
           child: Card(
             child: Row(
                     children: [
-                      SizedBox(
-                        width: 100,
-                        height: 50,
-                        child: DropdownButton(
-                          alignment: AlignmentDirectional.centerStart,
-                          borderRadius: BorderRadius.circular(10),
-                          value: "And",
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                          items: const [
-                            DropdownMenuItem(value: "And",child: Center(child : Text("And")),),
-                            DropdownMenuItem(value: "Or",child: Center(child: Text("Or")),)
-                          ],
-                          onChanged: (input){},
-                          underline: Container(),
+                      // SizedBox(
+                      //   width: 100,
+                      //   height: 50,
+                      //   child: DropdownButton(
+                      //     alignment: AlignmentDirectional.centerStart,
+                      //     borderRadius: BorderRadius.circular(10),
+                      //     padding:
+                      //         const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                      //     items: const [
+                      //       DropdownMenuItem(value: "And",child: Center(child : Text("And")),),
+                      //       DropdownMenuItem(value: "Or",child: Center(child: Text("Or")),)
+                      //     ],
+                      //     onChanged: (input){},
+                      //     underline: Container(),
+                      //   ),
+                      // ),
+                      Expanded(child: TextFormField(
+                        controller: controller,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder()
                         ),
                       ),
-                      SizedBox(width: 100,child: TextFormField(controller: controller,),)
+                      )
                     ],
                 )
           ),
-          )
+        )
       );
     });
   }
@@ -106,6 +114,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
               child: Column(
                 children: [
                   ElevatedButton(onPressed: pickFile, child: const Text("Browse File")),
+                  Text(_filePath),
                   const Center(child: Text("Keywords List"),),
                   ..._wordFields,
                   Center(
@@ -128,7 +137,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: 
-                  _sentencesList.map((item) => Text("$item\n")).toList()
+                  _sentencesList.map((item) => Card(child: Align(alignment: Alignment.centerLeft, child: SelectableText("$item\n")))).toList()
               ),
             ))
         ],
