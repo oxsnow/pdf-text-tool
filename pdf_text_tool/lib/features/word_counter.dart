@@ -12,7 +12,7 @@ class WordCounter {
     //extract text from pdf
     PdfDocument document = PdfDocument(inputBytes: File(path).readAsBytesSync());
     String text = PdfTextExtractor(document).extractText();
-    List<String> splitSentences = text.split('.');
+    List<String> splitSentences = text.replaceAll("\n", " ").split('.');
     document.dispose();
 
     List<String> sentences = [];
