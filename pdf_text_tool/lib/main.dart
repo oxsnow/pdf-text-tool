@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:pdf_text_tool/utils/feature_class.dart';
+import 'package:pdf_text_tool/screens/word_counter_screen.dart';
 import 'package:pdf_text_tool/features/word_counter.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
 import 'package:pdf_text_tool/utils/placeholder_tab.dart';
 
-List<Featureclass> features = [
-  WordCounter(),
-  PlaceholderTab(),
+List<FeatureScreen> features = [
+  const WordCounterScreen(),
+  const PlaceholderTabScreen(),
 ];
 
 void main() {
@@ -38,14 +38,13 @@ class HomePage extends StatelessWidget {
       child: Scaffold(
         appBar: TabBar(
             tabs: features.map((feature) {
-              FeatureScreen item = feature.screen! as FeatureScreen;
-              return Tab(icon: item.classIcon, text: item.title);
+              return Tab(icon: feature.classIcon, text: feature.title);
             },
           ).toList()
         ),
         body: TabBarView(
           children: features.map((feature) {
-            return feature.screen!;
+            return feature as Widget;
           }).toList(),
         ),
       ),

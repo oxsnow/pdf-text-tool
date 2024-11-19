@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pdf_text_tool/features/word_counter.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -17,22 +18,49 @@ class WordCounterScreen extends StatefulWidget with FeatureScreen {
 }
 
 class _WordCounterScreenState extends State<WordCounterScreen> {
-  List<Widget> _wordFields = [];
+  final List<Widget> _wordFields = [];
+  final List<TextEditingController> _controllers = [];
+  String _filePath = "";
+  final WordCounter _wordCounter = WordCounter();
+  int _wordFound = 0;
+  final List<String> _sentencesList = [];
 
   Future<void> pickFile() async {
-  FilePickerResult? result = await FilePicker.platform.pickFiles();
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
 
-  if (result != null) {
-    PlatformFile file = result.files.first;
-    debugPrint('File name: ${file.name}');
-    debugPrint('File path: ${file.path}');
-  } else {
-    // User canceled the picker
+    if (result != null) {
+      PlatformFile file = result.files.first;
+      debugPrint('File name: ${file.name}');
+      debugPrint('File path: ${file.path}');
+      _filePath = file.path!;
+    }
   }
-}
+
+  void startSearch(){
+    setState(() {
+      List<String> keywords = [];
+      for (var controller in _controllers) {
+        keywords.add(controller.text);
+      }
+      _sentencesList.addAll(_wordCounter.count(_filePath, keywords));
+      debugPrint('Found sentences: $_sentencesList');
+      _wordFound = _sentencesList.length;
+    });
+  }
+
+  void removeFormField() { 
+    if (_controllers.isNotEmpty) { 
+      setState(() { 
+        _controllers.removeLast(); 
+        _wordFields.removeLast(); 
+      }); 
+    } 
+  }
 
   void addField() {
     setState(() {
+      final controller = TextEditingController();
+      _controllers.add(controller);
       _wordFields.add(
         Padding(
           padding: const EdgeInsets.all(8),
@@ -56,7 +84,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
                           underline: Container(),
                         ),
                       ),
-                      SizedBox(width: 100,child: TextFormField(),)
+                      SizedBox(width: 100,child: TextFormField(controller: controller,),)
                     ],
                 )
           ),
@@ -80,12 +108,29 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
                   ElevatedButton(onPressed: pickFile, child: const Text("Browse File")),
                   const Center(child: Text("Keywords List"),),
                   ..._wordFields,
-                  ElevatedButton(onPressed: addField, child: const Icon(Icons.add))
+                  Center(
+                    child: Row(children: [
+                      ElevatedButton(onPressed: addField, child: const Icon(Icons.add)),
+                      _wordFields.isNotEmpty ? 
+                      ElevatedButton(onPressed: startSearch, child: const Text("Search")) :
+                      Container(),
+                      _wordFields.isNotEmpty ? 
+                      ElevatedButton(onPressed: removeFormField, child: const Icon(Icons.remove)) :
+                      Container(),
+                    ],),
+                  )
                 ],
               ),
             ),
           ),
-          const Center(child: Text("Keywords Result"),),
+          Center(child: Text("Keywords Result $_wordFound"),),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: 
+                  _sentencesList.map((item) => Text("$item\n")).toList()
+              ),
+            ))
         ],
       ),
     );

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pdf_text_tool/utils/feature_class.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
 
 class PlaceholderTabScreen extends StatefulWidget with FeatureScreen {
@@ -19,11 +18,4 @@ class _PlaceholderTabScreenState extends State<PlaceholderTabScreen> {
   Widget build(BuildContext context) {
     return const Placeholder();
   }
-}
-
-class PlaceholderTab extends Featureclass {
-  @override
-  Widget? get screen => const PlaceholderTabScreen();
-
-  PlaceholderTab();
 }
