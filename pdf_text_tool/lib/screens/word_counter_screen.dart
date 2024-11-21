@@ -144,24 +144,24 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
                 ),
               ),
             ),
-            Center(child: Text("Keywords Result $_wordFound"),),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: 
-                    // _sentencesList.map((item) => Card(child: Align(alignment: Alignment.centerLeft, child: SelectableText("$item\n")))).toList()
-                    _sentencesList.entries.expand((entry) {
-                      return entry.value.map((value) {
-                        return Card(
-                          child: ListTile(
-                            title: SelectableText(entry.key),
-                            subtitle: Align(alignment: Alignment.centerLeft, child: SelectableText(value)),
-                          ),
-                        );
-                      }).toList();
-                    }).toList()
-                ),
-              ))
+              child: ListView(
+                children: 
+                  _sentencesList.entries.map((entry) {
+                    return Card(
+                      child: ExpansionTile(
+                        title: SelectableText(entry.key),
+                        subtitle: Text("Keywords Result ${_wordFound[entry.key]}"),
+                        children: entry.value.map((value) {
+                                  return ListTile(
+                                    title: Card(child: SelectableText("$value\n")),
+                                  );
+                                }).toList()
+                        ),
+                    );
+                  }).toList()
+              )
+            )
           ],
         ),
       ),
