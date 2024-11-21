@@ -3,6 +3,7 @@ import 'package:pdf_text_tool/features/word_counter.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:modal_progress_hud_nsn/modal_progress_hud_nsn.dart';
 
 class WordCounterScreen extends StatefulWidget with FeatureScreen {
   const WordCounterScreen({super.key});
@@ -24,6 +25,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
   final WordCounter _wordCounter = WordCounter();
   int _wordFound = 0;
   final List<String> _sentencesList = [];
+  bool _isloading = false;
 
   Future<void> pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
@@ -41,14 +43,24 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
   void startSearch(){
     _sentencesList.clear();
     setState(() {
-      List<String> keywords = [];
-      for (var controller in _controllers) {
-        keywords.add(controller.text);
-      }
-      _sentencesList.addAll(_wordCounter.count(_filePath, keywords));
-      debugPrint('Found sentences: $_sentencesList');
-      _wordFound = _sentencesList.length;
+      _isloading = true;
+      debugPrint("before future");
     });
+
+    List<String> keywords = [];
+    for (var controller in _controllers) {
+      keywords.add(controller.text);
+    }
+    _wordCounter.count(_filePath, keywords).then((ret) {
+      setState(() {
+        _isloading = false;
+        _sentencesList.addAll(ret);
+        // debugPrint('Found sentences: $_sentencesList');
+        _wordFound = _sentencesList.length;
+      });
+      debugPrint("future");
+    });
+    debugPrint("wait future");
   }
 
   void removeFormField() { 
@@ -70,22 +82,6 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
           child: Card(
             child: Row(
                     children: [
-                      // SizedBox(
-                      //   width: 100,
-                      //   height: 50,
-                      //   child: DropdownButton(
-                      //     alignment: AlignmentDirectional.centerStart,
-                      //     borderRadius: BorderRadius.circular(10),
-                      //     padding:
-                      //         const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                      //     items: const [
-                      //       DropdownMenuItem(value: "And",child: Center(child : Text("And")),),
-                      //       DropdownMenuItem(value: "Or",child: Center(child: Text("Or")),)
-                      //     ],
-                      //     onChanged: (input){},
-                      //     underline: Container(),
-                      //   ),
-                      // ),
                       Expanded(child: TextFormField(
                         controller: controller,
                         decoration: const InputDecoration(
@@ -102,45 +98,49 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          Container(
-            height: 200,
-            width: double.infinity,
-            decoration: BoxDecoration( border: Border.all(color: Colors.blue), ),
-            child: SingleChildScrollView(
-
-              child: Column(
-                children: [
-                  ElevatedButton(onPressed: pickFile, child: const Text("Browse File")),
-                  Text(_filePath),
-                  const Center(child: Text("Keywords List"),),
-                  ..._wordFields,
-                  Center(
-                    child: Row(children: [
-                      ElevatedButton(onPressed: addField, child: const Icon(Icons.add)),
-                      _wordFields.isNotEmpty ? 
-                      ElevatedButton(onPressed: startSearch, child: const Text("Search")) :
-                      Container(),
-                      _wordFields.isNotEmpty ? 
-                      ElevatedButton(onPressed: removeFormField, child: const Icon(Icons.remove)) :
-                      Container(),
-                    ],),
-                  )
-                ],
+    return ModalProgressHUD(
+      progressIndicator: const CircularProgressIndicator(),
+      inAsyncCall: _isloading,
+      child: Scaffold(
+        body: Column(
+          children: [
+            Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration( border: Border.all(color: Colors.blue), ),
+              child: SingleChildScrollView(
+      
+                child: Column(
+                  children: [
+                    ElevatedButton(onPressed: pickFile, child: const Text("Browse File")),
+                    Text(_filePath),
+                    const Center(child: Text("Keywords List"),),
+                    ..._wordFields,
+                    Center(
+                      child: Row(children: [
+                        ElevatedButton(onPressed: addField, child: const Icon(Icons.add)),
+                        _wordFields.isNotEmpty ? 
+                        ElevatedButton(onPressed: startSearch, child: const Text("Search")) :
+                        Container(),
+                        _wordFields.isNotEmpty ? 
+                        ElevatedButton(onPressed: removeFormField, child: const Icon(Icons.remove)) :
+                        Container(),
+                      ],),
+                    )
+                  ],
+                ),
               ),
             ),
-          ),
-          Center(child: Text("Keywords Result $_wordFound"),),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: 
-                  _sentencesList.map((item) => Card(child: Align(alignment: Alignment.centerLeft, child: SelectableText("$item\n")))).toList()
-              ),
-            ))
-        ],
+            Center(child: Text("Keywords Result $_wordFound"),),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: 
+                    _sentencesList.map((item) => Card(child: Align(alignment: Alignment.centerLeft, child: SelectableText("$item\n")))).toList()
+                ),
+              ))
+          ],
+        ),
       ),
     );
   }

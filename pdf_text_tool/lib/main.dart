@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:pdf_text_tool/screens/word_counter_screen.dart';
-import 'package:pdf_text_tool/features/word_counter.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
 import 'package:pdf_text_tool/utils/placeholder_tab.dart';
 

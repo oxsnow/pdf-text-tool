@@ -1,13 +1,11 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
-import 'package:pdf_text_tool/screens/word_counter_screen.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 class WordCounter {
   WordCounter();
 
-  List<String> count(String path, List<String> keywords){
+  Future<List<String>> count(String path, List<String> keywords) async {
 
     //extract text from pdf
     PdfDocument document = PdfDocument(inputBytes: File(path).readAsBytesSync());
