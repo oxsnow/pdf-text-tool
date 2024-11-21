@@ -19,23 +19,33 @@ class WordCounterScreen extends StatefulWidget with FeatureScreen {
 }
 
 class _WordCounterScreenState extends State<WordCounterScreen> {
+  // keywords
   final List<Widget> _wordFields = [];
   final List<TextEditingController> _controllers = [];
-  String _filePath = "";
+
+  // file meta data
+  final List<String> _filePaths = [];
+  final List<String> _fileNames = [];
+
+  // results
+  Map<String, int> _wordFound = {};
+  Map<String, List<String>> _sentencesList = {};
+
+  // class members
   final WordCounter _wordCounter = WordCounter();
-  int _wordFound = 0;
-  final List<String> _sentencesList = [];
   bool _isloading = false;
 
   Future<void> pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    FilePickerResult? result = await FilePicker.platform.pickFiles(allowMultiple: true);
 
     if (result != null) {
-      PlatformFile file = result.files.first;
-      debugPrint('File name: ${file.name}');
-      debugPrint('File path: ${file.path}');
+      _filePaths.clear();
       setState(() {
-        _filePath = file.path!;
+        for (var file in result.files) {
+          _filePaths.add(file.path!);
+          _fileNames.add(file.name);
+          debugPrint('File path: ${file.path}');
+        }
       });
     }
   }
@@ -51,12 +61,15 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
     for (var controller in _controllers) {
       keywords.add(controller.text);
     }
-    _wordCounter.count(_filePath, keywords).then((ret) {
+    _wordCounter.count(_filePaths, keywords).then((ret) {
+      _sentencesList = {};
       setState(() {
         _isloading = false;
-        _sentencesList.addAll(ret);
+        _sentencesList = ret;
         // debugPrint('Found sentences: $_sentencesList');
-        _wordFound = _sentencesList.length;
+        for (var key in _sentencesList.keys) {
+          _wordFound[key] = _sentencesList[key]!.length;
+        }
       });
       debugPrint("future");
     });
@@ -113,7 +126,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
                 child: Column(
                   children: [
                     ElevatedButton(onPressed: pickFile, child: const Text("Browse File")),
-                    Text(_filePath),
+                    Text(_fileNames.join(',')),
                     const Center(child: Text("Keywords List"),),
                     ..._wordFields,
                     Center(
@@ -136,7 +149,17 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
               child: SingleChildScrollView(
                 child: Column(
                   children: 
-                    _sentencesList.map((item) => Card(child: Align(alignment: Alignment.centerLeft, child: SelectableText("$item\n")))).toList()
+                    // _sentencesList.map((item) => Card(child: Align(alignment: Alignment.centerLeft, child: SelectableText("$item\n")))).toList()
+                    _sentencesList.entries.expand((entry) {
+                      return entry.value.map((value) {
+                        return Card(
+                          child: ListTile(
+                            title: SelectableText(entry.key),
+                            subtitle: Align(alignment: Alignment.centerLeft, child: SelectableText(value)),
+                          ),
+                        );
+                      }).toList();
+                    }).toList()
                 ),
               ))
           ],
