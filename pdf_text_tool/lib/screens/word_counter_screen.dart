@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
 import 'package:pdf_text_tool/features/word_counter.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
@@ -26,6 +28,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
   // file meta data
   final List<String> _filePaths = [];
   final List<String> _fileNames = [];
+  final int _maxNameLength = 30;
 
   // results
   Map<String, int> _wordFound = {};
@@ -111,6 +114,11 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
   }
   @override
   Widget build(BuildContext context) {
+    String browsedFiles = _fileNames.join(',');
+    if(browsedFiles.length > _maxNameLength*2){
+      String nameList = _fileNames.join(',');
+      browsedFiles = '${nameList.substring(0,_maxNameLength)} ... ${nameList.substring(nameList.length - _maxNameLength)}';
+    }
     return ModalProgressHUD(
       progressIndicator: const CircularProgressIndicator(),
       inAsyncCall: _isloading,
@@ -126,7 +134,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
                 child: Column(
                   children: [
                     ElevatedButton(onPressed: pickFile, child: const Text("Browse File")),
-                    Text(_fileNames.join(',')),
+                    Text(browsedFiles),
                     const Center(child: Text("Keywords List"),),
                     ..._wordFields,
                     Center(
