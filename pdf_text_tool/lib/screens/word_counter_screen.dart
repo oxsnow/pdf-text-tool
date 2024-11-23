@@ -91,6 +91,13 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
     }); 
   }
 
+  void exportExcel() async{
+    String? path = await FilePicker.platform.getDirectoryPath();
+    if(path!=null){
+      _wordCounter.exportExcel(path, _sentencesList);
+    }
+  }
+
   void addField() {
     setState(() {
       final controller = TextEditingController();
@@ -198,6 +205,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
             )
           ],
         ),
+        floatingActionButton: ElevatedButton(onPressed: exportExcel, child: const Text("Export to Excel")),
       ),
     );
   }
