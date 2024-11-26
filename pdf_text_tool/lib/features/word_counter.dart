@@ -30,7 +30,7 @@ class WordCounter {
     return resultMap;
   }
 
-  void exportExcel(String path, Map<String,List<String>> data){
+  List<dynamic> exportExcel(String path, Map<String,List<String>> data){
     // Create a new Excel document 
     var excel = Excel.createExcel(); 
 
@@ -49,10 +49,13 @@ class WordCounter {
     // String path = '${documentsDirectory.path}/file.xlsx'; 
 
     // Save the Excel file 
+    try {
     final file = File("$path/export.xlsx") 
     ..createSync(recursive: true) 
     ..writeAsBytesSync(excel.save()!); 
-    
-    print('Excel file created successfully at $path');
+      return [true, ""];
+    } catch (e) {
+      return [false, e.toString()];
+    } 
   }
 }

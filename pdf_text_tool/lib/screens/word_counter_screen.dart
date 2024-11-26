@@ -94,7 +94,27 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
   void exportExcel() async{
     String? path = await FilePicker.platform.getDirectoryPath();
     if(path!=null){
-      _wordCounter.exportExcel(path, _sentencesList);
+      var retVal = _wordCounter.exportExcel(path, _sentencesList);
+      if(!retVal[0]){
+        if(mounted){
+          showDialog(
+            context: context, 
+            builder: (BuildContext context) { 
+              return AlertDialog( 
+                title: const Text('Save Error'), 
+                content: Text('${retVal[1]}'), 
+                actions: [ 
+                  TextButton( 
+                    child: const Text('OK'), 
+                    onPressed: () { 
+                      Navigator.of(context).pop();
+                    }
+                  )
+                ],
+              );
+            });
+        }
+      }
     }
   }
 
