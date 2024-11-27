@@ -38,6 +38,7 @@ dependencies:
   syncfusion_flutter_pdf: ^27.2.2
   file_picker: ^8.1.4
   modal_progress_hud_nsn: ^0.5.1
+  excel: ^4.0.6
 
 dev_dependencies:
   flutter_test:

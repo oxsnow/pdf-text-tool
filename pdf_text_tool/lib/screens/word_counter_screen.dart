@@ -1,10 +1,7 @@
-import 'dart:ffi';
-
 import 'package:flutter/material.dart';
 import 'package:pdf_text_tool/features/word_counter.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:modal_progress_hud_nsn/modal_progress_hud_nsn.dart';
 
 class WordCounterScreen extends StatefulWidget with FeatureScreen {
@@ -88,6 +85,39 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
     } 
   }
 
+  void deleteSentence(String key, int index) { 
+    setState(() { 
+      _sentencesList[key]!.removeAt(index); 
+    }); 
+  }
+
+  void exportExcel() async{
+    String? path = await FilePicker.platform.getDirectoryPath();
+    if(path!=null){
+      var retVal = _wordCounter.exportExcel(path, _sentencesList);
+      if(!retVal[0]){
+        if(mounted){
+          showDialog(
+            context: context, 
+            builder: (BuildContext context) { 
+              return AlertDialog( 
+                title: const Text('Save Error'), 
+                content: Text('${retVal[1]}'), 
+                actions: [ 
+                  TextButton( 
+                    child: const Text('OK'), 
+                    onPressed: () { 
+                      Navigator.of(context).pop();
+                    }
+                  )
+                ],
+              );
+            });
+        }
+      }
+    }
+  }
+
   void addField() {
     setState(() {
       final controller = TextEditingController();
@@ -160,11 +190,34 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
                       child: ExpansionTile(
                         title: SelectableText(entry.key),
                         subtitle: Text("Keywords Result ${_wordFound[entry.key]}"),
-                        children: entry.value.map((value) {
-                                  return ListTile(
-                                    title: Card(child: SelectableText("$value\n")),
-                                  );
-                                }).toList()
+                        // children: entry.value.map((value) {
+                        //           return ListTile(
+                        //             title: Card(child: SelectableText("$value\n")),
+                        //           );
+                        //         }).toList()
+
+                        // children: [
+                        //   ListView.builder(
+                        //     itemCount: _sentencesList[entry.key]!.length,
+                        //     itemBuilder: (context, index) {
+                        //       return Card(
+                        //         child: ListTile(
+                        //           title: SelectableText("${_sentencesList[entry.key]![index]}\n"),
+                        //           subtitle: ElevatedButton(onPressed: () => deleteSentence(entry.key, index), child: const Icon(Icons.delete)),
+                        //         ),
+                        //       );
+                        //     })
+                        // ],
+
+                        children: [
+                          for(int i = 0; i < _sentencesList[entry.key]!.length; i++)
+                            Card(
+                              child: ListTile(
+                                  title: SelectableText("${_sentencesList[entry.key]![i]}\n"),
+                                  subtitle: ElevatedButton(onPressed: () => deleteSentence(entry.key, i), child: const Icon(Icons.delete)),
+                              ),
+                            ) 
+                        ],
                         ),
                     );
                   }).toList()
@@ -172,6 +225,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
             )
           ],
         ),
+        floatingActionButton: ElevatedButton(onPressed: exportExcel, child: const Text("Export to Excel")),
       ),
     );
   }
