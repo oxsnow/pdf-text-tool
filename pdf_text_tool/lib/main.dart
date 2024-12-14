@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:pdf_text_tool/screens/word_counter_screen.dart';
+import 'package:pdf_text_tool/screens/sentiment_analysis_screen.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
 import 'package:pdf_text_tool/utils/placeholder_tab.dart';
 
 List<FeatureScreen> features = [
   const WordCounterScreen(),
+  SentimentAnalysisScreen(),
   const PlaceholderTabScreen(),
 ];
 
