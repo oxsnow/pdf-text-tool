@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:pdf_text_tool/features/word_counter.dart';
 import 'package:pdf_text_tool/utils/feature_screen.dart';
@@ -50,7 +52,76 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
     }
   }
 
-  void startSearch(){
+  Future<void> pickFolder() async {
+    String? result = await FilePicker.platform.getDirectoryPath();
+    if (result != null) {
+      var dir = Directory(result);
+      List<String> dirs = [];
+      await for (FileSystemEntity entity in dir.list(recursive: true, followLinks: false)){
+        if (entity is Directory){
+          dirs.add(entity.path);
+        }
+      }
+    List<String> selectedDirs = [];
+    Map<String, bool> checkboxState = {for (var folder in dirs) folder: false};
+    showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text('Select Folders'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: dirs.map((folder) {
+                return CheckboxListTile(
+                  title: Text(folder),
+                  value: checkboxState[folder],
+                  onChanged: (bool? value) {
+                    setState(() {
+                      checkboxState[folder] = value!;
+                      if(value){
+                        selectedDirs.add(folder);
+                        print("add $folder");
+                      }
+                      else{
+                        selectedDirs.remove(folder);
+                        print("remove $folder");
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            );
+          },
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () async{
+              print("check $selectedDirs");
+              _filePaths.clear();
+              for (var path in selectedDirs) {
+                print("check $path");
+                var checkDir = Directory(path);
+                await for(FileSystemEntity entity in checkDir.list(recursive: true, followLinks: false)){
+                  if(entity is File && entity.path.endsWith(".pdf")){
+                    _filePaths.add(entity.path);
+                    _fileNames.add(entity.path);
+                  }
+                }
+              }
+              setState(() {});
+              Navigator.of(context).pop();
+            },
+            child: Text('OK'),
+          ),
+        ],
+      );
+    });
+    }
+  }
+
+  void startSearch() async{
     _sentencesList.clear();
     setState(() {
       _isloading = true;
@@ -61,19 +132,49 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
     for (var controller in _controllers) {
       keywords.add(controller.text);
     }
-    _wordCounter.count(_filePaths, keywords).then((ret) {
-      _sentencesList = {};
-      setState(() {
-        _isloading = false;
-        _sentencesList = ret;
-        // debugPrint('Found sentences: $_sentencesList');
-        for (var key in _sentencesList.keys) {
-          _wordFound[key] = _sentencesList[key]!.length;
+    await _wordCounter.clientWordCount(_filePaths, keywords);
+    debugPrint("done request");
+    while(true){
+      debugPrint("iterate status");
+      var data = await _wordCounter.checkStatus();
+      if(data.containsKey("result")){
+        if(data["result"]!.isNotEmpty){
+          debugPrint("${data["result"]}");
+          // _sentencesList = data.map((key, value) {
+          //   debugPrint("$key,$value");
+          //   return MapEntry(key, List<String>.from(value));
+          // },);
+          dynamic sentences = data["result"];
+          sentences.forEach((key, value) {
+            // Overwrite the value in map2 with the value from map1
+            _sentencesList[key] = List<String>.from(value);
+            _wordFound[key] = _sentencesList[key]!.length;
+          });
+          _isloading = false;
         }
+      }
+      if(data.containsKey("status")){
+        if(data["status"] == "completed"){
+          break;
+        }
+      }
+      setState(() {
+        
       });
-      debugPrint("future");
-    });
-    debugPrint("wait future");
+    }
+    // _wordCounter.count(_filePaths, keywords).then((ret) {
+    //   _sentencesList = {};
+    //   setState(() {
+    //     _isloading = false;
+    //     _sentencesList = ret;
+    //     // debugPrint('Found sentences: $_sentencesList');
+    //     for (var key in _sentencesList.keys) {
+    //       _wordFound[key] = _sentencesList[key]!.length;
+    //     }
+    //   });
+    //   debugPrint("future");
+    // });
+    // debugPrint("wait future");
   }
 
   void removeFormField() { 
@@ -163,7 +264,14 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
       
                 child: Column(
                   children: [
-                    ElevatedButton(onPressed: pickFile, child: const Text("Browse File")),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton(onPressed: pickFile, child: const Text("Browse File")),
+                        ElevatedButton(onPressed: pickFolder, child: const Text("Browse Folder")),
+                      ],
+                    ),
                     Text(browsedFiles),
                     const Center(child: Text("Keywords List"),),
                     ..._wordFields,

@@ -1,9 +1,13 @@
 import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class WordCounter {
   WordCounter();
+
+  String taskId = "";
 
   Future<Map<String, List<String>>> count(List<String> paths, List<String> keywords) async {
     Map<String, List<String>> resultMap = {};
@@ -28,6 +32,29 @@ class WordCounter {
     
 
     return resultMap;
+  }
+
+  Future<void> clientWordCount(List<String> paths, List<String> keywords) async {
+    final response = await http.post(
+      Uri.parse('http://localhost:5000/start_word_count'),
+      headers: <String, String>{'Content-Type': 'application/json; charset=UTF-8'},
+      body: json.encode({
+        'file_paths': paths,
+        'keywords': keywords
+      }),
+    );
+
+    final data = json.decode(response.body);
+    taskId = data["task_id"];
+  }
+
+  Future<Map<String, dynamic>> checkStatus() async{
+    Map<String,dynamic> result = {};
+    final response = await http.get(Uri.parse('http://localhost:5000/word_count_status/$taskId'));
+    final data = json.decode(response.body);
+    result = data;
+    await Future.delayed(const Duration(seconds: 2));
+    return result;
   }
 
   List<dynamic> exportExcel(String path, Map<String,List<String>> data){
