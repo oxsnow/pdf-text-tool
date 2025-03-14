@@ -71,27 +71,29 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
         title: Text('Select Folders'),
         content: StatefulBuilder(
           builder: (context, setState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: dirs.map((folder) {
-                return CheckboxListTile(
-                  title: Text(folder),
-                  value: checkboxState[folder],
-                  onChanged: (bool? value) {
-                    setState(() {
-                      checkboxState[folder] = value!;
-                      if(value){
-                        selectedDirs.add(folder);
-                        print("add $folder");
-                      }
-                      else{
-                        selectedDirs.remove(folder);
-                        print("remove $folder");
-                      }
-                    });
-                  },
-                );
-              }).toList(),
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: dirs.map((folder) {
+                  return CheckboxListTile(
+                    title: Text(folder),
+                    value: checkboxState[folder],
+                    onChanged: (bool? value) {
+                      setState(() {
+                        checkboxState[folder] = value!;
+                        if(value){
+                          selectedDirs.add(folder);
+                          print("add $folder");
+                        }
+                        else{
+                          selectedDirs.remove(folder);
+                          print("remove $folder");
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
             );
           },
         ),
@@ -139,7 +141,7 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
       var data = await _wordCounter.checkStatus();
       if(data.containsKey("result")){
         if(data["result"]!.isNotEmpty){
-          debugPrint("${data["result"]}");
+          // debugPrint("${data["result"]}");
           // _sentencesList = data.map((key, value) {
           //   debugPrint("$key,$value");
           //   return MapEntry(key, List<String>.from(value));
@@ -154,7 +156,11 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
         }
       }
       if(data.containsKey("status")){
+        debugPrint(data["status"]);
         if(data["status"] == "completed"){
+          setState(() {
+        
+          });
           break;
         }
       }
@@ -289,6 +295,22 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
                   ],
                 ),
               ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: LinearProgressIndicator(
+                  value: (_sentencesList.length / _filePaths.length).isFinite && !(_sentencesList.length / _filePaths.length).isNaN ? (_sentencesList.length / _filePaths.length) : 0,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                ),),
+                Expanded(
+                  flex: 1,
+                  child: Text("${_sentencesList.length} / ${_filePaths.length}"),
+                )
+              ],
             ),
             Expanded(
               child: ListView(

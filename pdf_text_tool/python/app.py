@@ -3,6 +3,7 @@ from flask_executor import Executor
 from collections import Counter
 import os
 import PyPDF2
+from datetime import datetime
 
 app = Flask(__name__)
 executor = Executor(app)
@@ -10,6 +11,24 @@ executor = Executor(app)
 word_count_results = {}
 task_status = {}
 resultMap = {}
+sentencesFileName = ""
+summaryFileName = ""
+
+wordPerFile = {}
+
+def extract_ticker_and_year(filename):
+    # Split the filename into parts
+    parts = filename.split('_')
+
+    # Check if the filename matches the expected format
+    if len(parts) == 3 and parts[1] == "Annual Report":
+        ticker = parts[0]
+        year = parts[2]
+    else:
+        ticker = filename
+        year = "-"
+
+    return ticker, year
 
 def count(paths, keywords):
     """
@@ -23,6 +42,9 @@ def count(paths, keywords):
     :return: The updated resultMap.
     """
     global resultMap
+    global sentencesFileName
+    global summaryFileName
+    global wordPerFile
     # Optionally clear the global resultMap at the beginning.
     resultMap.clear()
     
@@ -57,8 +79,30 @@ def count(paths, keywords):
 
         # Use the file's basename as the dictionary key.
         filename = os.path.basename(path)
-        resultMap[filename] = sentences
+        # print(f"saving {filename}")
+        ticker, year = extract_ticker_and_year(filename.split(".")[0])
+        # print(f"{ticker},{year}")
+        # resultMap[filename] = sentences
+        wordPerFile[ticker + " " + year] = len(sentences)
+        print(f"{sentencesFileName}")
+        with open(sentencesFileName, "a", encoding='utf-8', errors='replace') as sentencesFile:
+            # print("start sentences")
+            if not sentences:
+                # print("set to empty")
+                sentencesFile.write(f"{ticker},{year},\n")
+            else:
+                # print("populate sentences")
+                for sentence in sentences:
+                    # print(f"{sentence}")
+                    sentencesFile.write(f"{ticker},{year},{sentence}\n")
+        # print("end sentences")
+        print(f"{summaryFileName}")
+        with open(summaryFileName, "a", encoding='utf-8', errors='replace') as summaryFile:
+            # print("start summary")
+            summaryFile.write(f"{ticker},{year},{len(sentences)}\n")
 
+        print("end")
+            
     return resultMap
 
 @app.route('/start_word_count', methods=['POST'])
@@ -68,6 +112,25 @@ def start_word_count():
     file_paths = data.get('file_paths', [])
     keywords = data.get('keywords', [])
     task_status[task_id] = 'running'
+
+    # Get the current date and time
+    now = datetime.now()
+
+    # Format the date and time as a string
+    dateStr = now.strftime("%Y-%m-%d %H-%M-%S")
+
+    global sentencesFileName
+    global summaryFileName
+
+    sentencesFileName = "sentences-" + dateStr + ".csv"
+    summaryFileName = "summary-"+dateStr + ".csv"
+
+    with open(sentencesFileName, "w") as sentencesFile:
+        sentencesFile.write("Ticker,Year,Sentence\n")
+
+    with open(summaryFileName, "w") as summaryFile:
+        summaryFile.write(f"Ticker,Year,{'&'.join(keywords)}\n")
+
     executor.submit_stored(task_id, process_word_count, task_id, file_paths, keywords)
     return jsonify({'task_id': task_id, 'status': 'started'})
 
@@ -78,8 +141,10 @@ def process_word_count(task_id, file_paths, keywords):
 
 @app.route('/word_count_status/<task_id>', methods=['GET'])
 def word_count_status(task_id):
+    global resultMap
     status = task_status.get(task_id, 'unknown')
-    return jsonify({'status': status, 'result': resultMap})
+    result = jsonify({'status': status, 'result': wordPerFile})
+    return result
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
