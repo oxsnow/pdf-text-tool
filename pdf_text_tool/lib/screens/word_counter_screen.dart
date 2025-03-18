@@ -149,8 +149,8 @@ class _WordCounterScreenState extends State<WordCounterScreen> {
           dynamic sentences = data["result"];
           sentences.forEach((key, value) {
             // Overwrite the value in map2 with the value from map1
-            _sentencesList[key] = List<String>.from(value);
-            _wordFound[key] = _sentencesList[key]!.length;
+            _sentencesList[key] = [];
+            _wordFound[key] = value;
           });
           _isloading = false;
         }
