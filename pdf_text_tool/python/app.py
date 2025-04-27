@@ -70,12 +70,15 @@ def count(paths, keywords):
         sentences = []
 
         # Check each sentence for any of the keywords (case-insensitive).
-        for sentence in split_sentences:
-            for keyword in keywords:
-                if keyword.lower() in sentence.lower():
-                    sentences.append(sentence.strip())
-                    # If a match is found, move to the next sentence
-                    break
+        if any(keyword.lower() in text.lower() for keyword in keywords):
+            for sentence in split_sentences:
+                for keyword in keywords:
+                    if keyword.lower() in sentence.lower():
+                        sentences.append(sentence.strip())
+                        # If a match is found, move to the next sentence
+                        break
+        else:
+            print("keyword not found")
 
         # Use the file's basename as the dictionary key.
         filename = os.path.basename(path)
