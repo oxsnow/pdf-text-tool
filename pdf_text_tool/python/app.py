@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_executor import Executor
 from collections import Counter
 import os
+import csv
 import PyPDF2
 from datetime import datetime
 
@@ -21,7 +22,7 @@ def extract_ticker_and_year(filename):
     parts = filename.split('_')
 
     # Check if the filename matches the expected format
-    if len(parts) == 3 and parts[1] == "Annual Report":
+    if len(parts) == 3:
         ticker = parts[0]
         year = parts[2]
     else:
@@ -52,11 +53,13 @@ def count(paths, keywords):
         print(f"processing {path}")
         text = ""
         # Extract text from PDF safely.
+        print(f"read {path}")
         try:
             with open(path, "rb") as f:
                 reader = PyPDF2.PdfReader(f)
                 # Iterate over all the pages in the PDF.
-                for page in reader.pages:
+                for count, page in enumerate(reader.pages):
+                    # print(f"read {count} of {len(reader.pages)}")
                     page_text = page.extract_text()
                     if page_text:
                         text += page_text + " "
@@ -64,19 +67,30 @@ def count(paths, keywords):
             # In case the file can't be read or processed.
             text = ""
             print(f"Error processing {path}: {e}")
+            continue
 
         # Replace newlines with spaces and split the text into sentences by period.
         split_sentences = text.replace("\n", " ").split('.')
-        sentences = []
+        sentences = [[] for _ in range(len(keywords))]
+        # for i in range(keywords):
+        #     sentences.append([])
+
+        print(f"process {path}")
 
         # Check each sentence for any of the keywords (case-insensitive).
         if any(keyword.lower() in text.lower() for keyword in keywords):
-            for sentence in split_sentences:
-                for keyword in keywords:
+            for sentenceIndex, sentence in enumerate(split_sentences):
+                # print(f"scan {sentenceIndex} out of {len(split_sentences)}")
+                for count, keyword in enumerate(keywords):
                     if keyword.lower() in sentence.lower():
-                        sentences.append(sentence.strip())
+                        print(f"keyword {keyword} index {count} found")
+
+                        # if len(sentences) <= count:
+                        #     sentences.append([])
+                            
+                        sentences[count].append(sentence.strip())
                         # If a match is found, move to the next sentence
-                        break
+                        # break
         else:
             print("keyword not found")
 
@@ -86,8 +100,8 @@ def count(paths, keywords):
         ticker, year = extract_ticker_and_year(filename.split(".")[0])
         # print(f"{ticker},{year}")
         # resultMap[filename] = sentences
-        wordPerFile[ticker + " " + year] = len(sentences)
-        print(f"{sentencesFileName}")
+        wordPerFile[ticker + " " + year] = len([item for sublist in sentences for item in sublist])
+        print(f"write to {sentencesFileName}")
         with open(sentencesFileName, "a", encoding='utf-8', errors='replace') as sentencesFile:
             # print("start sentences")
             if not sentences:
@@ -96,13 +110,15 @@ def count(paths, keywords):
             else:
                 # print("populate sentences")
                 for sentence in sentences:
-                    # print(f"{sentence}")
-                    sentencesFile.write(f"{ticker},{year},{sentence}\n")
+                    for sentencePart in sentence:
+                        # print(f"{sentence}")
+                        sentencesFile.write(f"{ticker},{year},{sentencePart}\n")
         # print("end sentences")
-        print(f"{summaryFileName}")
+        print(f"write to {summaryFileName}")
         with open(summaryFileName, "a", encoding='utf-8', errors='replace') as summaryFile:
             # print("start summary")
-            summaryFile.write(f"{ticker},{year},{len(sentences)}\n")
+            sentence_counts = [len(sentence_list) for sentence_list in sentences]
+            summaryFile.write(f"{ticker},{year}," + ",".join(map(str, sentence_counts)) + "\n")
 
         print("end")
             
@@ -132,7 +148,7 @@ def start_word_count():
         sentencesFile.write("Ticker,Year,Sentence\n")
 
     with open(summaryFileName, "w") as summaryFile:
-        summaryFile.write(f"Ticker,Year,{'&'.join(keywords)}\n")
+        summaryFile.write(f"Ticker,Year,{','.join(keywords)}\n")
 
     executor.submit_stored(task_id, process_word_count, task_id, file_paths, keywords)
     return jsonify({'task_id': task_id, 'status': 'started'})
