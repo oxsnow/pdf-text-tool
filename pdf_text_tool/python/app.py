@@ -166,4 +166,5 @@ def word_count_status(task_id):
     return result
 
 if __name__ == '__main__':
+    print("version 1.2.3")
     app.run(debug=True, port=5000)
