@@ -5,6 +5,7 @@ import os
 import csv
 import PyPDF2
 from datetime import datetime
+import re
 
 app = Flask(__name__)
 executor = Executor(app)
@@ -31,6 +32,27 @@ def extract_ticker_and_year(filename):
 
     return ticker, year
 
+def parse_query(query):
+    """
+    Parses the search query and returns structured components.
+    Converts '/' to OR, '&' to AND while maintaining parentheses.
+    
+    :param query: Boolean search query as a string.
+    :return: Parsed query suitable for regex searching.
+    """
+    re.sub(r'\s*"\s*', '"', query) #remove space before and after quote
+    query = query.replace(" OR", "OR")  # Replace OR operator space
+    query = query.replace("OR ", "OR")  # Replace OR operator space
+    query = query.replace("OR", "|")  # Replace OR operator
+    query = query.replace(" AND", "AND")  # Replace AND operator spaces
+    query = query.replace("AND ", "AND")  # Replace AND operator spaces
+    query = query.replace("AND", ".*")  # Replace AND operator with regex sequence
+    query = query.replace('" ','"') #remove spaces in quote
+    query = query.replace(' "','"') #remove spaces in quote
+    query = query.replace('"','') #remove quote
+    print(query)
+    return query
+
 def count(paths, keywords):
     """
     Reads each PDF from the list of paths, extracts the text,
@@ -48,6 +70,16 @@ def count(paths, keywords):
     global wordPerFile
     # Optionally clear the global resultMap at the beginning.
     resultMap.clear()
+
+    formatted_queries = []
+    queries = []
+    for query in keywords:
+        formatted = parse_query(query)
+        formatted_queries.append(formatted)
+        queries.append(re.compile(formatted, re.IGNORECASE))
+
+    fullQueries = re.compile("|".join(formatted_queries), re.IGNORECASE)
+    print(fullQueries)
     
     for path in paths:
         print(f"processing {path}")
@@ -78,17 +110,17 @@ def count(paths, keywords):
         print(f"process {path}")
 
         # Check each sentence for any of the keywords (case-insensitive).
-        if any(keyword.lower() in text.lower() for keyword in keywords):
+        if bool(fullQueries.search(text)):
             for sentenceIndex, sentence in enumerate(split_sentences):
                 # print(f"scan {sentenceIndex} out of {len(split_sentences)}")
                 for count, keyword in enumerate(keywords):
-                    if keyword.lower() in sentence.lower():
+                    if bool(queries[count].search(sentence)):
                         print(f"keyword {keyword} index {count} found")
 
                         # if len(sentences) <= count:
                         #     sentences.append([])
                             
-                        sentences[count].append(sentence.strip())
+                        sentences[count].append(sentence.replace(",","").replace(";","").strip())
                         # If a match is found, move to the next sentence
                         # break
         else:
@@ -109,10 +141,10 @@ def count(paths, keywords):
                 sentencesFile.write(f"{ticker},{year},\n")
             else:
                 # print("populate sentences")
-                for sentence in sentences:
+                for count, sentence in enumerate(sentences):
                     for sentencePart in sentence:
                         # print(f"{sentence}")
-                        sentencesFile.write(f"{ticker},{year},{sentencePart}\n")
+                        sentencesFile.write(f"{ticker},{year},"+ ","*count + f"{sentencePart}\n")
         # print("end sentences")
         print(f"write to {summaryFileName}")
         with open(summaryFileName, "a", encoding='utf-8', errors='replace') as summaryFile:
@@ -129,8 +161,10 @@ def start_word_count():
     data = request.json
     task_id = str(len(word_count_results) + 1)
     file_paths = data.get('file_paths', [])
-    keywords = data.get('keywords', [])
+    rawKeywords = data.get('keywords', [])
     task_status[task_id] = 'running'
+
+    keywords = [s.replace("\n", " ").replace("\r", " ").rstrip() for s in rawKeywords]
 
     # Get the current date and time
     now = datetime.now()
@@ -145,7 +179,7 @@ def start_word_count():
     summaryFileName = "summary-"+dateStr + ".csv"
 
     with open(sentencesFileName, "w") as sentencesFile:
-        sentencesFile.write("Ticker,Year,Sentence\n")
+        sentencesFile.write(f"Ticker,Year,{','.join(keywords)}\n")
 
     with open(summaryFileName, "w") as summaryFile:
         summaryFile.write(f"Ticker,Year,{','.join(keywords)}\n")
@@ -166,5 +200,5 @@ def word_count_status(task_id):
     return result
 
 if __name__ == '__main__':
-    print("version 1.2.3")
+    print("version 1.2.5")
     app.run(debug=True, port=5000)
