@@ -4,10 +4,19 @@ from collections import Counter
 import os
 import csv
 import PyPDF2
+import pymupdf
 from datetime import datetime
+import re
+import sys
+from concurrent.futures import ThreadPoolExecutor
+import threading
+sys.stdout.reconfigure(encoding='utf-8')
 
 app = Flask(__name__)
 executor = Executor(app)
+lock = threading.Lock()  # Mutex lock for shared resources
+sentence_lock = threading.Lock()  # Mutex lock for shared resources
+MAX_THREADS = 1  # Set the number of threads allowed
 
 word_count_results = {}
 task_status = {}
@@ -15,7 +24,21 @@ resultMap = {}
 sentencesFileName = ""
 summaryFileName = ""
 
+cpu_count = os.cpu_count()
+
+importFileName = "import.txt"
+
 wordPerFile = {}
+
+def extract_year(text):
+    # Try to match YYYY-YY format first
+    match = re.search(r"\b(\d{4})-\d{2}\b", text)
+    if match:
+        return match.group(1)
+    
+    # If no YYYY-YY match, try standalone YYYY format
+    match = re.search(r"\b(\d{4})\b", text)
+    return match.group(1) if match else "-"
 
 def extract_ticker_and_year(filename):
     # Split the filename into parts
@@ -24,104 +47,100 @@ def extract_ticker_and_year(filename):
     # Check if the filename matches the expected format
     if len(parts) == 3:
         ticker = parts[0]
-        year = parts[2]
+        year = extract_year(parts[2])
     else:
         ticker = filename
         year = "-"
 
     return ticker, year
 
-def count(paths, keywords):
+def parse_query(query):
     """
-    Reads each PDF from the list of paths, extracts the text,
-    splits the text into sentences, and for each sentence that contains 
-    any of the provided keywords (case-insensitive), it records that sentence.
-    The results are stored in the global variable `resultMap` with the file's basename as the key.
+    Parses the search query and returns structured components.
+    Converts '/' to OR, '&' to AND while maintaining parentheses.
     
-    :param paths: List of file paths to PDF files.
-    :param keywords: List of keywords to look for in the text.
-    :return: The updated resultMap.
+    :param query: Boolean search query as a string.
+    :return: Parsed query suitable for regex searching.
     """
-    global resultMap
-    global sentencesFileName
-    global summaryFileName
-    global wordPerFile
-    # Optionally clear the global resultMap at the beginning.
-    resultMap.clear()
-    
-    for path in paths:
-        print(f"processing {path}")
-        text = ""
-        # Extract text from PDF safely.
-        print(f"read {path}")
-        try:
-            with open(path, "rb") as f:
-                reader = PyPDF2.PdfReader(f)
-                # Iterate over all the pages in the PDF.
-                for count, page in enumerate(reader.pages):
-                    # print(f"read {count} of {len(reader.pages)}")
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + " "
-        except Exception as e:
-            # In case the file can't be read or processed.
-            text = ""
-            print(f"Error processing {path}: {e}")
-            continue
+    re.sub(r'\s*"\s*', '"', query) #remove space before and after quote
+    query = query.replace(" OR", "OR")  # Replace OR operator space
+    query = query.replace("OR ", "OR")  # Replace OR operator space
+    query = query.replace("OR", "|")  # Replace OR operator
+    query = query.replace(" AND", "AND")  # Replace AND operator spaces
+    query = query.replace("AND ", "AND")  # Replace AND operator spaces
+    query = query.replace("AND", ".*")  # Replace AND operator with regex sequence
+    query = query.replace('" ','"') #remove spaces in quote
+    query = query.replace(' "','"') #remove spaces in quote
+    query = query.replace('"','') #remove quote
+    print(query)
+    return query
 
-        # Replace newlines with spaces and split the text into sentences by period.
+def search_sentences(split_sentences, formatted_queries, sentences):
+    def process_sentence(sentenceIndex, sentence):
+        matches = [query.search(sentence) for query in formatted_queries]
+        for count, match in enumerate(matches):
+            if match:
+                sentences[count].append(sentence.replace(",", "").replace(";", "").strip())
+
+    # Use thread pool for concurrent sentence scanning
+    with ThreadPoolExecutor(max_workers=cpu_count) as executor:
+        executor.map(process_sentence, range(len(split_sentences)), split_sentences)
+
+
+def count(paths, keywords):
+    global resultMap, sentencesFileName, summaryFileName, wordPerFile
+    
+    # Ensure thread safety when modifying global variables
+    with lock:
+        resultMap.clear()
+        wordPerFile.clear()
+
+    formatted_queries = [re.compile(parse_query(query), re.IGNORECASE) for query in keywords]
+    fullQueries = re.compile("|".join([q.pattern for q in formatted_queries]), re.IGNORECASE)
+
+    def process_pdf(path):  # Function for individual PDF processing
+        print(f"Processing {path}")
+        text = ""
+
+        try:
+            with pymupdf.open(path) as doc:
+                text = "".join([page.get_text() for page in doc])
+        except Exception as e:
+            print(f"Error processing {path}: {e}")
+            return
+        print(f"end reading {path}")
         split_sentences = text.replace("\n", " ").split('.')
         sentences = [[] for _ in range(len(keywords))]
-        # for i in range(keywords):
-        #     sentences.append([])
 
-        print(f"process {path}")
+        # if bool(fullQueries.search(text)):
+        #     for sentenceIndex, sentence in enumerate(split_sentences):
+        #         for count, query in enumerate(formatted_queries):
+        #             if bool(query.search(sentence)):
+        #                 sentences[count].append(sentence.replace(",", "").replace(";", "").strip())
+        search_sentences(split_sentences, formatted_queries, sentences)
+        print(f"end search keyword {path}")
 
-        # Check each sentence for any of the keywords (case-insensitive).
-        if any(keyword.lower() in text.lower() for keyword in keywords):
-            for sentenceIndex, sentence in enumerate(split_sentences):
-                # print(f"scan {sentenceIndex} out of {len(split_sentences)}")
-                for count, keyword in enumerate(keywords):
-                    if keyword.lower() in sentence.lower():
-                        print(f"keyword {keyword} index {count} found")
-
-                        # if len(sentences) <= count:
-                        #     sentences.append([])
-                            
-                        sentences[count].append(sentence.strip())
-                        # If a match is found, move to the next sentence
-                        # break
-        else:
-            print("keyword not found")
-
-        # Use the file's basename as the dictionary key.
         filename = os.path.basename(path)
-        # print(f"saving {filename}")
-        ticker, year = extract_ticker_and_year(filename.split(".")[0])
-        # print(f"{ticker},{year}")
-        # resultMap[filename] = sentences
-        wordPerFile[ticker + " " + year] = len([item for sublist in sentences for item in sublist])
-        print(f"write to {sentencesFileName}")
-        with open(sentencesFileName, "a", encoding='utf-8', errors='replace') as sentencesFile:
-            # print("start sentences")
-            if not sentences:
-                # print("set to empty")
-                sentencesFile.write(f"{ticker},{year},\n")
-            else:
-                # print("populate sentences")
-                for sentence in sentences:
-                    for sentencePart in sentence:
-                        # print(f"{sentence}")
-                        sentencesFile.write(f"{ticker},{year},{sentencePart}\n")
-        # print("end sentences")
-        print(f"write to {summaryFileName}")
-        with open(summaryFileName, "a", encoding='utf-8', errors='replace') as summaryFile:
-            # print("start summary")
-            sentence_counts = [len(sentence_list) for sentence_list in sentences]
-            summaryFile.write(f"{ticker},{year}," + ",".join(map(str, sentence_counts)) + "\n")
+        ticker, year = extract_ticker_and_year(filename)
 
-        print("end")
-            
+        # Locking mechanism for updating global variables
+        with lock:
+            wordPerFile[ticker + " " + year] = len([item for sublist in sentences for item in sublist])
+            with open(sentencesFileName, "a", encoding='utf-8', errors='replace') as sentencesFile:
+                for count, sentence in enumerate(sentences):
+                    for sentencePart in sentence:
+                        sentencesFile.write(f"{ticker},{year},"+ ","*count + f"{sentencePart}\n")
+
+            with open(summaryFileName, "a", encoding='utf-8', errors='replace') as summaryFile:
+                sentence_counts = [len(sentence_list) for sentence_list in sentences]
+                summaryFile.write(f"{ticker},{year}," + ",".join(map(str, sentence_counts)) + "\n")
+
+    # Use a thread pool to limit concurrent threads
+    with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
+        executor.map(process_pdf, paths)
+    
+    print("all pdf has been processed")
+
     return resultMap
 
 @app.route('/start_word_count', methods=['POST'])
@@ -129,8 +148,20 @@ def start_word_count():
     data = request.json
     task_id = str(len(word_count_results) + 1)
     file_paths = data.get('file_paths', [])
-    keywords = data.get('keywords', [])
+    rawKeywords = data.get('keywords', [])
     task_status[task_id] = 'running'
+
+    if "##import##" in rawKeywords:
+        print("import prompt from import.txt")
+        global importFileName
+        with open(importFileName, "r", encoding="utf-8") as importFile:
+            rawKeywords.extend(line.strip() for line in importFile)
+
+    while "##import##" in rawKeywords:
+        rawKeywords.remove("##import##")
+
+    keywords = [s.replace("\n", " ").replace("\r", " ").rstrip() for s in rawKeywords]
+    print(keywords)
 
     # Get the current date and time
     now = datetime.now()
@@ -145,7 +176,7 @@ def start_word_count():
     summaryFileName = "summary-"+dateStr + ".csv"
 
     with open(sentencesFileName, "w") as sentencesFile:
-        sentencesFile.write("Ticker,Year,Sentence\n")
+        sentencesFile.write(f"Ticker,Year,{','.join(keywords)}\n")
 
     with open(summaryFileName, "w") as summaryFile:
         summaryFile.write(f"Ticker,Year,{','.join(keywords)}\n")
@@ -163,8 +194,10 @@ def word_count_status(task_id):
     global resultMap
     status = task_status.get(task_id, 'unknown')
     result = jsonify({'status': status, 'result': wordPerFile})
+    with lock:
+        wordPerFile.clear()
     return result
 
 if __name__ == '__main__':
-    print("version 1.2.3")
-    app.run(debug=True, port=5000)
+    print("version 1.4.0")
+    app.run(debug=False, port=5000)
